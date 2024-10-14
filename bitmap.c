@@ -3,6 +3,7 @@
 #include <bitmap.h>
 #include <stdlib.h>
 #include <fcntl.h>
+#include <sys/mman.h>
 #include <stdio.h>
 #include <unistd.h>
 #include <string.h>
@@ -16,8 +17,8 @@ typedef struct {
 
 typedef struct {
     uint32_t header_size;
-    uint32_t file_width;
-    uint32_t file_height;
+    uint32_t width;
+    uint32_t height;
     uint16_t color_planes;
     uint16_t bit_depth;
     uint32_t compression;
@@ -36,9 +37,34 @@ bmp_t bmp_init(size_t width, size_t height) {
     return bmp;
 }
 
+bmp_t bmp_load(char *filename) {
+    int fd = open(filename, O_RDWR, 0);
+    if (fd < 0) exit(EXIT_FAILURE);
+    
+    /* load headers */
+    bmp_fileheader_t fileheader;
+    read(fd, &fileheader, sizeof(fileheader));
+
+    // if info header is not 40 bytes long,
+    // discard it (only bmp v1 is suported)
+    if (fileheader.offset - sizeof(fileheader) != 40)
+        exit(EXIT_FAILURE);
+
+    bmp_infoheader_t infoheader;
+    read(fd, &infoheader, sizeof(infoheader));
+
+    /* load pixel data into memory */
+    bmp_t bmp = bmp_init(infoheader.width, infoheader.height);
+    read(fd, bmp.pixels, infoheader.image_size);
+
+    return bmp;
+}
+
 void bmp_free(bmp_t bmp) {
-    free(bmp.pixels);
-    bmp.pixels = NULL;
+    if (bmp.pixels) {
+        free(bmp.pixels);
+        bmp.pixels = NULL;
+    }
 }
 
 int bmp_rowsize(bmp_t bmp) {
@@ -68,8 +94,8 @@ void bmp_write(bmp_t bmp, const char *filename) {
     // write info header
     bmp_infoheader_t infoheader = {
         .header_size = 40,
-        .file_width = bmp.width,
-        .file_height = bmp.height,
+        .width = bmp.width,
+        .height = bmp.height,
         .color_planes = 1,
         .bit_depth = 24,
         .compression = 0,
@@ -83,7 +109,7 @@ void bmp_write(bmp_t bmp, const char *filename) {
 
     // write pixel data
     int row_size = bmp_rowsize(bmp);
-    for (int y = bmp.height - 1; y >= 0; y--) {
+    for (int y = 0; y < bmp.height; y++) {
         for (int x = 0; x < bmp.width; x++) {
             color_t color = bmp.pixels[y * bmp.width + x];
             uint8_t red = (color & 0xFF0000) >> 16;
@@ -104,6 +130,7 @@ void bmp_write(bmp_t bmp, const char *filename) {
 }
 
 void bmp_set_pixel(bmp_t bmp, int x, int y, color_t color) {
-    if (0 <= x && x < bmp.width && 0 <= y && y < bmp.height)
-        bmp.pixels[y * bmp.width + x] = color;
+    if (0 <= x && x < bmp.width && 0 <= y && y < bmp.height) {
+        bmp.pixels[(bmp.height-y-1) * bmp.width + x] = color;
+    }
 }
