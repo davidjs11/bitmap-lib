@@ -28,7 +28,6 @@ typedef struct {
     uint32_t important_colors;
 } __attribute__((packed)) bmp_infoheader_t;
 
-
 bmp_t bmp_init(size_t width, size_t height) {
     bmp_t bmp;
     bmp.width = width;
@@ -53,20 +52,21 @@ int bmp_imagesize(bmp_t bmp) {
     return bmp_rowsize(bmp) * bmp.height;
 }
 
-bmp_fileheader_t bmp_fileheader(bmp_t bmp) {
-    bmp_fileheader_t header = {
+void bmp_write(bmp_t bmp, const char *filename) {
+    int fd = open(filename, O_CREAT | O_TRUNC | O_RDWR, S_IRWXU);
+    if (fd < 0) exit(EXIT_FAILURE);
+
+    // write file header
+    bmp_fileheader_t fileheader = {
         .file_size = 14 + 40 + bmp_imagesize(bmp),
         .reserved = 0,
         .offset = 14 + 40,
     };
-    strncpy(header.header_field, "BM", 2);
-    printf("%d\n", bmp_imagesize(bmp));
+    strncpy(fileheader.header_field, "BM", 2);
+    write(fd, &fileheader, sizeof(fileheader));
 
-    return header;
-}
-
-bmp_infoheader_t bmp_infoheader(bmp_t bmp) {
-    bmp_infoheader_t header = {
+    // write info header
+    bmp_infoheader_t infoheader = {
         .header_size = 40,
         .file_width = bmp.width,
         .file_height = bmp.height,
@@ -79,18 +79,6 @@ bmp_infoheader_t bmp_infoheader(bmp_t bmp) {
         .num_colors = 0,
         .important_colors = 0,
     };
-
-    return header;
-}
-
-void bmp_write(bmp_t bmp, const char *filename) {
-    int fd = open(filename, O_CREAT | O_TRUNC | O_RDWR, S_IRWXU);
-    if (fd < 0) exit(EXIT_FAILURE);
-
-    // write headers
-    bmp_fileheader_t fileheader = bmp_fileheader(bmp);
-    bmp_infoheader_t infoheader = bmp_infoheader(bmp);
-    write(fd, &fileheader, sizeof(fileheader));
     write(fd, &infoheader, sizeof(infoheader));
 
     // write pixel data
@@ -106,13 +94,10 @@ void bmp_write(bmp_t bmp, const char *filename) {
             write(fd, &red, 1);
         }
 
-        printf("row size: %d\n", row_size);
         for (int i = bmp.width * 3; i < row_size; i++) {
-            printf("o");
             char null = 0x00;
             write(fd, &null, 1);
         }
-        printf("\n");
     }
 
     close(fd);
