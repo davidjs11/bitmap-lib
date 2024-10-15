@@ -8,6 +8,7 @@
 #include <unistd.h>
 #include <string.h>
 
+/* --- private structures --- */
 typedef struct {
     char header_field[2];
     uint32_t file_size;
@@ -29,7 +30,8 @@ typedef struct {
     uint32_t important_colors;
 } __attribute__((packed)) bmp_infoheader_t;
 
-/* private functions */
+
+/* --- private functions --- */
 size_t bmp_rowsize(size_t width, size_t height) {
     size_t row_size = width * 3;
     if (row_size % 4) row_size += 4 - (row_size % 4);
@@ -46,7 +48,8 @@ size_t bmp_get_index(bmp_t bmp, int x, int y) {
     return row * bmp_rowsize(bmp.width, bmp.height) + col;
 }
 
-/* public functions */
+
+/* --- private functions --- */
 bmp_t bmp_create(size_t width, size_t height) {
     bmp_t bmp;
     bmp.width = width;
@@ -57,7 +60,7 @@ bmp_t bmp_create(size_t width, size_t height) {
 
 bmp_t bmp_load(char *filename) {
     int fd = open(filename, O_RDWR, 0);
-    if (fd < 0) exit(EXIT_FAILURE);
+    if (fd < 0) exit(EXIT_FAILURE); // assert
 
     /* load headers */
     bmp_fileheader_t fileheader;
@@ -66,7 +69,7 @@ bmp_t bmp_load(char *filename) {
     // if info header is not 40 bytes long,
     // discard it (only bmp v1 is suported)
     if (fileheader.offset - sizeof(fileheader) != 40)
-        exit(EXIT_FAILURE);
+        exit(EXIT_FAILURE); // assert
 
     bmp_infoheader_t infoheader;
     read(fd, &infoheader, sizeof(infoheader));
@@ -87,18 +90,16 @@ void bmp_free(bmp_t bmp) {
 
 void bmp_write(bmp_t bmp, const char *filename) {
     int fd = open(filename, O_CREAT | O_TRUNC | O_RDWR, S_IRWXU);
-    if (fd < 0) exit(EXIT_FAILURE);
+    if (fd < 0) exit(EXIT_FAILURE); // assert
 
-    // write file header
+    /* create headers */
     bmp_fileheader_t fileheader = {
         .file_size = 14 + 40 + bmp_imagesize(bmp.width, bmp.height),
         .reserved = 0,
         .offset = 14 + 40,
     };
     strncpy(fileheader.header_field, "BM", 2);
-    write(fd, &fileheader, sizeof(fileheader));
 
-    // write info header
     bmp_infoheader_t infoheader = {
         .header_size = 40,
         .width = bmp.width,
@@ -112,20 +113,11 @@ void bmp_write(bmp_t bmp, const char *filename) {
         .num_colors = 0,
         .important_colors = 0,
     };
+
+    /* write data */
+    write(fd, &fileheader, sizeof(fileheader));
     write(fd, &infoheader, sizeof(infoheader));
-
-    // write pixel data
-    int rowsize = bmp_rowsize(bmp.width, bmp.height);
-    for (int y = bmp.height-1; y >= 0; y--) {
-        for (int x = 0; x < bmp.width; x++) {
-            write(fd, &(bmp.pixels[bmp_get_index(bmp, x, y)]), sizeof(pixel_t));
-        }
-
-        for (int i = bmp.width * 3; i < rowsize; i++) {
-            char null = 0x00;
-            write(fd, &null, 1);
-        }
-    }
+    write(fd, bmp.pixels, bmp_imagesize(bmp.width, bmp.height));
 
     close(fd);
 }
@@ -135,7 +127,8 @@ color_t bmp_get_pixel(bmp_t bmp, int x, int y) {
     // there would be an assert
     if (0 <= x && x < bmp.width && 0 <= y && y < bmp.height) {
         size_t index = bmp_get_index(bmp, x, y);
-        pixel_t pixel = bmp.pixels[index];
+        pixel_t pixel;
+        memcpy(&pixel, ((uint8_t *) bmp.pixels)+index, sizeof(pixel));
         uint8_t red = (pixel.r & 0xFF);
         uint8_t green = (pixel.g & 0xFF);
         uint8_t blue = (pixel.b & 0xFF);
@@ -148,8 +141,10 @@ void bmp_set_pixel(bmp_t bmp, int x, int y, uint32_t color) {
     // also assert
     if (0 <= x && x < bmp.width && 0 <= y && y < bmp.height) {
         size_t index = bmp_get_index(bmp, x, y);
-        bmp.pixels[index].r = (color & 0xFF0000) >> 16;
-        bmp.pixels[index].g = (color & 0x00FF00) >>  8;
-        bmp.pixels[index].b = (color & 0x0000FF) >>  0;
+        pixel_t pixel;
+        pixel.r = (color & 0xFF0000) >> 16;
+        pixel.g = (color & 0x00FF00) >>  8;
+        pixel.b = (color & 0x0000FF) >>  0;
+        memcpy(((uint8_t *) bmp.pixels)+index, &pixel, sizeof(pixel));
     }
 }
