@@ -8,6 +8,16 @@
 #include <unistd.h>
 #include <string.h>
 
+
+/* --- custom assert flex ;) --- */
+#define ASSERT(cond, ...) {\
+    if(!(cond)) {\
+        fprintf(stderr,__VA_ARGS__);\
+        exit(EXIT_FAILURE);\
+    }\
+}
+
+
 /* --- private structures --- */
 typedef struct {
     char header_field[2];
@@ -43,6 +53,7 @@ size_t bmp_imagesize(size_t width, size_t height) {
 }
 
 size_t bmp_get_index(bmp_t bmp, int x, int y) {
+    // get index in bytes
     size_t row = (bmp.height - y - 1);
     size_t col = 3 * x;
     return row * bmp_rowsize(bmp.width, bmp.height) + col;
@@ -58,9 +69,9 @@ bmp_t bmp_create(size_t width, size_t height) {
     return bmp;
 }
 
-bmp_t bmp_load(char *filename) {
+bmp_t bmp_load(const char *filename) {
     int fd = open(filename, O_RDWR, 0);
-    if (fd < 0) exit(EXIT_FAILURE); // assert
+    ASSERT(fd >= 0, "[-] open(%s, ...)\n", filename);
 
     /* load headers */
     bmp_fileheader_t fileheader;
@@ -68,8 +79,8 @@ bmp_t bmp_load(char *filename) {
 
     // if info header is not 40 bytes long,
     // discard it (only bmp v1 is suported)
-    if (fileheader.offset - sizeof(fileheader) != 40)
-        exit(EXIT_FAILURE); // assert
+    ASSERT(fileheader.offset - sizeof(fileheader) == 40,
+           "[-] only bitmap DIBv1 is supported\n");
 
     bmp_infoheader_t infoheader;
     read(fd, &infoheader, sizeof(infoheader));
@@ -90,8 +101,12 @@ void bmp_free(bmp_t bmp) {
 
 void bmp_write(bmp_t bmp, const char *filename) {
     int fd = open(filename, O_CREAT | O_TRUNC | O_RDWR, S_IRWXU);
-    if (fd < 0) exit(EXIT_FAILURE); // assert
+    ASSERT(fd >= 0, "[-] open(%s, ...).\n", filename);
+    
+    bmp_dwrite(bmp, fd);
+}
 
+void bmp_dwrite(bmp_t bmp, int fd) {
     /* create headers */
     bmp_fileheader_t fileheader = {
         .file_size = 14 + 40 + bmp_imagesize(bmp.width, bmp.height),
@@ -122,29 +137,27 @@ void bmp_write(bmp_t bmp, const char *filename) {
     close(fd);
 }
 
-color_t bmp_get_pixel(bmp_t bmp, int x, int y) {
-    color_t color;
-    // there would be an assert
-    if (0 <= x && x < bmp.width && 0 <= y && y < bmp.height) {
-        size_t index = bmp_get_index(bmp, x, y);
-        pixel_t pixel;
-        memcpy(&pixel, ((uint8_t *) bmp.pixels)+index, sizeof(pixel));
-        uint8_t red = (pixel.r & 0xFF);
-        uint8_t green = (pixel.g & 0xFF);
-        uint8_t blue = (pixel.b & 0xFF);
-        color = (red << 16) | (green << 8) | blue;
-    }
-    return color;
+color_t bmp_get_pixel(bmp_t bmp, size_t x, size_t y) {
+    ASSERT(0 <= x && x < bmp.width && 0 <= y && y < bmp.height,
+           "[-] bmp_get_pixel(%u, %u): invalid position.\n", x, y);
+
+    pixel_t pixel;
+    size_t index = bmp_get_index(bmp, x, y);
+    memcpy(&pixel, ((uint8_t *) bmp.pixels)+index, sizeof(pixel));
+
+    return ((pixel.r << 16) | (pixel.g << 8) | pixel.b);
 }
 
-void bmp_set_pixel(bmp_t bmp, int x, int y, uint32_t color) {
-    // also assert
-    if (0 <= x && x < bmp.width && 0 <= y && y < bmp.height) {
-        size_t index = bmp_get_index(bmp, x, y);
-        pixel_t pixel;
-        pixel.r = (color & 0xFF0000) >> 16;
-        pixel.g = (color & 0x00FF00) >>  8;
-        pixel.b = (color & 0x0000FF) >>  0;
-        memcpy(((uint8_t *) bmp.pixels)+index, &pixel, sizeof(pixel));
-    }
+void bmp_set_pixel(bmp_t bmp, size_t x, size_t y, uint32_t color) {
+    ASSERT(0 <= x && x < bmp.width && 0 <= y && y < bmp.height,
+           "[-] bmp_set_pixel(%u, %u): invalid position.\n", x, y);
+
+    pixel_t pixel = {
+        .r = (color & 0xFF0000) >> 16,
+        .g = (color & 0x00FF00) >>  8,
+        .b = (color & 0x0000FF) >>  0
+    };
+
+    size_t index = bmp_get_index(bmp, x, y);
+    memcpy(((uint8_t *) bmp.pixels)+index, &pixel, sizeof(pixel));
 }
