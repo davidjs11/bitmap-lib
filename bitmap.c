@@ -40,6 +40,12 @@ typedef struct {
     uint32_t important_colors;
 } __attribute__((packed)) bmp_infoheader_t;
 
+typedef struct {
+    uint8_t     b;
+    uint8_t     g;
+    uint8_t     r;
+} __attribute__((packed)) pixel_t;
+
 
 /* --- private functions --- */
 size_t bmp_rowsize(size_t width, size_t height) {
@@ -65,7 +71,7 @@ bmp_t bmp_create(size_t width, size_t height) {
     bmp_t bmp;
     bmp.width = width;
     bmp.height = height;
-    bmp.pixels = (pixel_t *) malloc(bmp_imagesize(width, height));
+    bmp.pixels = (void *) malloc(bmp_imagesize(width, height));
     return bmp;
 }
 
@@ -143,7 +149,7 @@ color_t bmp_get_pixel(bmp_t bmp, size_t x, size_t y) {
 
     pixel_t pixel;
     size_t index = bmp_get_index(bmp, x, y);
-    memcpy(&pixel, ((uint8_t *) bmp.pixels)+index, sizeof(pixel));
+    memcpy(&pixel, bmp.pixels+index, sizeof(pixel));
 
     return ((pixel.r << 16) | (pixel.g << 8) | pixel.b);
 }
@@ -159,5 +165,5 @@ void bmp_set_pixel(bmp_t bmp, size_t x, size_t y, uint32_t color) {
     };
 
     size_t index = bmp_get_index(bmp, x, y);
-    memcpy(((uint8_t *) bmp.pixels)+index, &pixel, sizeof(pixel));
+    memcpy(bmp.pixels+index, &pixel, sizeof(pixel));
 }

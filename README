@@ -1,0 +1,10 @@
+==== bitmap-lib ====
+
+A library for working with .bmp files in C, using UNIX/Linux syscalls.
+It lets the programmer work with pixels in a .bmp file.
+For the moment only DIB version 1 bitmap files.
+Documentation can be found in the 'DOC' file.
+Example programs can be found in 'src/' folder.
+
+Bitmap file format specification can be found at:
+    https://en.wikipedia.org/wiki/BMP_file_format

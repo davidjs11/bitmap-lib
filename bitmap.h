@@ -15,16 +15,10 @@
 typedef uint32_t color_t;
 
 typedef struct {
-    uint8_t     b;
-    uint8_t     g;
-    uint8_t     r;
-} __attribute__((packed)) pixel_t;
-
-typedef struct {
     uint32_t    width;
     uint32_t    height;
     uint32_t    file_size;
-    pixel_t     *pixels;
+    void        *pixels;
 } bmp_t;
 
 

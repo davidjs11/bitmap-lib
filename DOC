@@ -1,0 +1,55 @@
+======= bitmap-lib ========
+=====  documentation ======
+
+
+---- data types and structures ----
+- color_t
+  A 32-bit value that stores a 24-bit RGB color code (first
+  8 bits are ignored)
+
+- bmp_t,
+  Holds basic info about a .bmp file (width, height and pixel array)
+
+
+---- macros ----
+
+RGB(r, g, b) -> returns the color_t value of an (r, g, b) value.
+                r, g and b are between 0 and 255 (0x00 and 0xFF).
+                
+RGB32(r, g, b) -> same as RGB(r, g, b)
+
+
+---- functions ----
+
+bmp_t   bmp_create(size_t width, size_t height);
+    Create and initialize a bmp_t structure based on the
+    width and the height of the desired .bmp file.
+
+
+bmp_t   bmp_load(const char *filename);
+    Load a .bmp image from a certain file and return
+    the correspondent bmp_t structure.
+
+
+void    bmp_free(bmp_t bmp);
+    Free memory resources associated to a bmp_t structure.
+    Use it when finishing your programs.
+
+
+void    bmp_write(bmp_t bmp, const char *filename);
+    Save a bmp_t structure that resides in memory as a
+    new .bmp file.
+
+void    bmp_dwrite(bmp_t bmp, int fd);
+    Same as bmp_write, but writing it directly to a certain
+    file descriptor.
+
+
+void    bmp_set_pixel(bmp_t bmp, size_t x, size_t y, uint32_t color);
+    Set value for a certain (x, y) pixel in the bmp_t image.
+    A bmp_write() is needed to save the changes in the file.
+
+
+color_t bmp_get_pixel(bmp_t bmp, size_t x, size_t y);
+    get the color value for a certain (x, y) pixel in
+    the bmp_t image.
