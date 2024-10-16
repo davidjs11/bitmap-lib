@@ -22,4 +22,3 @@ dirs:
 .PHONY: clean
 clean:
 	@rm -rf $(BIN)
-
